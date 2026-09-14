@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  portable-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install test dependency
+        run: sudo apt-get update && sudo apt-get install -y libgtest-dev
+      - name: Configure
+        run: >-
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          -DOMNIDETECT_BUILD_DESKTOP=OFF
+          -DOMNIDETECT_ENABLE_NCNN=OFF
+          -DOMNIDETECT_ENABLE_ONNX=OFF
+          -DOMNIDETECT_WARNINGS_AS_ERRORS=ON
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Benchmark smoke
+        run: ./build/omnidetect_benchmark
+
+  portable-windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >-
+          cmake -S . -B build -A x64
+          -DOMNIDETECT_BUILD_DESKTOP=OFF
+          -DOMNIDETECT_ENABLE_NCNN=OFF
+          -DOMNIDETECT_ENABLE_ONNX=OFF
+      - name: Build
+        run: cmake --build build --config Release --parallel 2
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+

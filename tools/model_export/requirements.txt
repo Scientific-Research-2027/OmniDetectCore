@@ -1,0 +1,5 @@
+# Pin these versions in the deployment project's lock file after validating its exact YOLO26 export.
+ultralytics>=8.4
+onnx>=1.17
+onnxsim>=0.4.36
+

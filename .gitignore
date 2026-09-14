@@ -1,0 +1,16 @@
+/build*/
+/b/
+/b*/
+/.cache/
+/.venv/
+__pycache__/
+*.user
+*.suo
+*.pdb
+*.ilk
+*.onnx
+*.pt
+*.bin
+models/yolo26n/*.param
+models/yolo26n/metadata.json
+models/yolo26n/classes.txt
