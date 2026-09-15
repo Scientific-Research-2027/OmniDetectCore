@@ -3,10 +3,6 @@
 #include "output/IResultSink.h"
 
 #include <QObject>
-#include <QMetaType>
-
-Q_DECLARE_METATYPE(omnidetect::Frame)
-Q_DECLARE_METATYPE(omnidetect::DetectionResult)
 
 namespace omnidetect {
 

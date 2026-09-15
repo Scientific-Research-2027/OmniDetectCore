@@ -39,17 +39,68 @@ if(OMNIDETECT_ENABLE_NCNN)
 endif()
 
 if(OMNIDETECT_ENABLE_ONNX)
+
+  # First try a normal CMake package installation.
   find_package(onnxruntime CONFIG QUIET)
-  if(NOT onnxruntime_FOUND)
-    message(FATAL_ERROR "OMNIDETECT_ENABLE_ONNX=ON, but ONNX Runtime was not found. Set onnxruntime_DIR to its CMake package.")
-  endif()
+
   if(TARGET onnxruntime::onnxruntime)
+
     set(OMNIDETECT_ONNX_TARGET onnxruntime::onnxruntime)
+
   elseif(TARGET onnxruntime)
+
     set(OMNIDETECT_ONNX_TARGET onnxruntime)
+
+  elseif(ONNXRUNTIME_ROOT)
+
+    message(STATUS "Using ONNX Runtime binary distribution from: ${ONNXRUNTIME_ROOT}")
+
+    find_path(
+      ONNXRUNTIME_INCLUDE_DIR
+      NAMES onnxruntime_cxx_api.h
+      PATHS "${ONNXRUNTIME_ROOT}/include"
+      NO_DEFAULT_PATH
+    )
+
+    find_library(
+      ONNXRUNTIME_LIBRARY
+      NAMES onnxruntime
+      PATHS "${ONNXRUNTIME_ROOT}/lib"
+      NO_DEFAULT_PATH
+    )
+
+    if(NOT ONNXRUNTIME_INCLUDE_DIR)
+      message(FATAL_ERROR
+        "ONNX Runtime headers were not found under "
+        "${ONNXRUNTIME_ROOT}/include")
+    endif()
+
+    if(NOT ONNXRUNTIME_LIBRARY)
+      message(FATAL_ERROR
+        "onnxruntime.lib was not found under "
+        "${ONNXRUNTIME_ROOT}/lib")
+    endif()
+
+    add_library(onnxruntime::onnxruntime UNKNOWN IMPORTED)
+
+    set_target_properties(
+      onnxruntime::onnxruntime
+      PROPERTIES
+        IMPORTED_LOCATION "${ONNXRUNTIME_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_INCLUDE_DIR}"
+    )
+
+    set(OMNIDETECT_ONNX_TARGET onnxruntime::onnxruntime)
+
   else()
-    message(FATAL_ERROR "The ONNX Runtime package was found but exports neither onnxruntime::onnxruntime nor onnxruntime target.")
+
+    message(FATAL_ERROR
+      "ONNX Runtime was not found. "
+      "Set onnxruntime_DIR to a CMake package or "
+      "ONNXRUNTIME_ROOT to an extracted Windows binary distribution.")
+
   endif()
+
 endif()
 
 add_library(omnidetect_core
