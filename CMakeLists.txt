@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.24)
 
+# Allow find_package() to honor upper-case <PACKAGENAME>_ROOT variables
+# such as ONNXRUNTIME_ROOT on newer CMake versions.
+if(POLICY CMP0144)
+  cmake_policy(SET CMP0144 NEW)
+endif()
+
 project(OmniDetectCore VERSION 0.1.0 LANGUAGES CXX)
 
 option(OMNIDETECT_BUILD_DESKTOP "Build the Qt 6 desktop application" ON)
@@ -69,6 +75,16 @@ if(OMNIDETECT_ENABLE_ONNX)
       NO_DEFAULT_PATH
     )
 
+    if(WIN32)
+      find_file(
+        ONNXRUNTIME_DLL
+        NAMES onnxruntime.dll
+        PATHS
+        "${ONNXRUNTIME_ROOT}/lib"
+        "${ONNXRUNTIME_ROOT}/bin"
+        NO_DEFAULT_PATH)   
+    endif()
+
     if(NOT ONNXRUNTIME_INCLUDE_DIR)
       message(FATAL_ERROR
         "ONNX Runtime headers were not found under "
@@ -81,14 +97,38 @@ if(OMNIDETECT_ENABLE_ONNX)
         "${ONNXRUNTIME_ROOT}/lib")
     endif()
 
-    add_library(onnxruntime::onnxruntime UNKNOWN IMPORTED)
+    if(WIN32 AND NOT ONNXRUNTIME_DLL)
+      message(FATAL_ERROR
+        "onnxruntime.dll was not found under "
+        "${ONNXRUNTIME_ROOT}/lib or ${ONNXRUNTIME_ROOT}/bin")
+    endif()
 
-    set_target_properties(
-      onnxruntime::onnxruntime
-      PROPERTIES
-        IMPORTED_LOCATION "${ONNXRUNTIME_LIBRARY}"
-        INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_INCLUDE_DIR}"
-    )
+    if(WIN32)
+      add_library(onnxruntime::onnxruntime SHARED IMPORTED)
+
+      set_target_properties(
+        onnxruntime::onnxruntime
+        PROPERTIES
+          IMPORTED_IMPLIB "${ONNXRUNTIME_LIBRARY}"
+          IMPORTED_LOCATION "${ONNXRUNTIME_DLL}"
+          INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_INCLUDE_DIR}"
+      )
+
+      # Optional ONNX Runtime provider DLLs distributed with the Windows package.
+      file(GLOB ONNXRUNTIME_PROVIDER_DLLS
+        "${ONNXRUNTIME_ROOT}/lib/onnxruntime_providers*.dll"
+        "${ONNXRUNTIME_ROOT}/bin/onnxruntime_providers*.dll"
+      )
+    else()
+      add_library(onnxruntime::onnxruntime UNKNOWN IMPORTED)
+
+      set_target_properties(
+        onnxruntime::onnxruntime
+        PROPERTIES
+          IMPORTED_LOCATION "${ONNXRUNTIME_LIBRARY}"
+          INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_INCLUDE_DIR}"
+      )
+    endif()
 
     set(OMNIDETECT_ONNX_TARGET onnxruntime::onnxruntime)
 
@@ -102,6 +142,44 @@ if(OMNIDETECT_ENABLE_ONNX)
   endif()
 
 endif()
+
+# Copy ONNX Runtime beside Windows executables so Windows loads the same
+# runtime version that the project was compiled and linked against.
+function(omnidetect_copy_onnx_runtime target_name)
+  if(NOT WIN32 OR NOT OMNIDETECT_ENABLE_ONNX)
+    return()
+  endif()
+
+  if(NOT TARGET "${target_name}")
+    message(FATAL_ERROR "Cannot deploy ONNX Runtime: target '${target_name}' does not exist.")
+  endif()
+
+  if(NOT OMNIDETECT_ONNX_TARGET OR NOT TARGET "${OMNIDETECT_ONNX_TARGET}")
+    message(FATAL_ERROR "Cannot deploy ONNX Runtime: inference target is not available.")
+  endif()
+
+  add_custom_command(
+    TARGET "${target_name}"
+    POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+      "$<TARGET_FILE:${OMNIDETECT_ONNX_TARGET}>"
+      "$<TARGET_FILE_DIR:${target_name}>"
+    COMMENT "Copying ONNX Runtime DLL for ${target_name}"
+    VERBATIM
+  )
+
+  foreach(provider_dll IN LISTS ONNXRUNTIME_PROVIDER_DLLS)
+    add_custom_command(
+      TARGET "${target_name}"
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${provider_dll}"
+        "$<TARGET_FILE_DIR:${target_name}>"
+      COMMENT "Copying ONNX Runtime provider DLL for ${target_name}: ${provider_dll}"
+      VERBATIM
+    )
+  endforeach()
+endfunction()
 
 add_library(omnidetect_core
   core/logging/Logger.cpp
@@ -179,6 +257,7 @@ if(OMNIDETECT_BUILD_EDGE)
   add_executable(omnidetect_edge apps/edge/main.cpp)
   target_link_libraries(omnidetect_edge PRIVATE omnidetect_application)
   omnidetect_set_warnings(omnidetect_edge)
+  omnidetect_copy_onnx_runtime(omnidetect_edge)
 endif()
 
 if(OMNIDETECT_BUILD_DESKTOP)
@@ -194,6 +273,7 @@ if(OMNIDETECT_BUILD_DESKTOP)
     )
     target_link_libraries(omnidetect_desktop PRIVATE omnidetect_application Qt6::Widgets)
     omnidetect_set_warnings(omnidetect_desktop)
+    omnidetect_copy_onnx_runtime(omnidetect_desktop)
   else()
     message(STATUS "Qt 6 Widgets not found: desktop target disabled. Set Qt6_DIR and reconfigure to enable it.")
   endif()
@@ -203,6 +283,7 @@ if(OMNIDETECT_BUILD_BENCHMARK)
   add_executable(omnidetect_benchmark tools/benchmark/main.cpp)
   target_link_libraries(omnidetect_benchmark PRIVATE omnidetect_core)
   omnidetect_set_warnings(omnidetect_benchmark)
+  omnidetect_copy_onnx_runtime(omnidetect_benchmark)
 endif()
 
 if(OMNIDETECT_BUILD_TESTS)
@@ -222,6 +303,7 @@ if(OMNIDETECT_BUILD_TESTS)
     message(STATUS "GoogleTest not found: tests use the dependency-free compatibility runner")
   endif()
   omnidetect_set_warnings(omnidetect_tests)
+  omnidetect_copy_onnx_runtime(omnidetect_tests)
   add_test(NAME omnidetect_tests COMMAND omnidetect_tests)
 endif()
 
