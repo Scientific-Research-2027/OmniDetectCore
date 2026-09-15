@@ -181,6 +181,102 @@ function(omnidetect_copy_onnx_runtime target_name)
   endforeach()
 endfunction()
 
+# Copy OpenCV runtime DLLs beside Windows executables that use the input/output
+# adapters. This keeps clean builds runnable without editing PATH manually.
+function(omnidetect_copy_opencv_runtime target_name)
+  if(NOT WIN32 OR NOT OpenCV_FOUND)
+    return()
+  endif()
+
+  if(NOT TARGET "${target_name}")
+    message(FATAL_ERROR "Cannot deploy OpenCV runtime: target '${target_name}' does not exist.")
+  endif()
+
+  # Official OpenCV Windows packages usually place runtime DLLs under:
+  #   <OpenCV_DIR>/x64/vcXX/bin
+  # Copy all release runtime DLLs (world + videoio/ffmpeg helpers, if present).
+  file(GLOB_RECURSE OMNIDETECT_OPENCV_RUNTIME_DLLS
+    "${OpenCV_DIR}/x64/*/bin/*.dll"
+  )
+
+  if(NOT OMNIDETECT_OPENCV_RUNTIME_DLLS)
+    message(WARNING
+      "OpenCV was found, but no runtime DLLs were found below '${OpenCV_DIR}/x64/*/bin'. "
+      "The target '${target_name}' may require OpenCV DLLs on PATH.")
+    return()
+  endif()
+
+  foreach(opencv_dll IN LISTS OMNIDETECT_OPENCV_RUNTIME_DLLS)
+    get_filename_component(opencv_dll_name "${opencv_dll}" NAME)
+
+    # Skip common Debug DLLs such as opencv_world4140d.dll for Release builds.
+    if(opencv_dll_name MATCHES "d\\.dll$")
+      continue()
+    endif()
+
+    add_custom_command(
+      TARGET "${target_name}"
+      POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${opencv_dll}"
+        "$<TARGET_FILE_DIR:${target_name}>"
+      COMMENT "Copying OpenCV runtime for ${target_name}: ${opencv_dll_name}"
+      VERBATIM
+    )
+  endforeach()
+endfunction()
+
+# Deploy Qt runtime and plugins automatically for the Windows desktop app.
+function(omnidetect_deploy_qt target_name)
+  if(NOT WIN32)
+    return()
+  endif()
+
+  if(NOT TARGET "${target_name}")
+    message(FATAL_ERROR "Cannot deploy Qt runtime: target '${target_name}' does not exist.")
+  endif()
+
+  if(NOT Qt6_FOUND)
+    message(FATAL_ERROR "Cannot deploy Qt runtime: Qt 6 was not found.")
+  endif()
+
+  # Qt6_DIR normally points to:
+  #   <QtRoot>/lib/cmake/Qt6
+  # therefore ../../../bin contains windeployqt.exe.
+  find_program(
+    OMNIDETECT_WINDEPLOYQT_EXECUTABLE
+    NAMES windeployqt windeployqt.exe
+    HINTS "${Qt6_DIR}/../../../bin"
+    NO_DEFAULT_PATH
+  )
+
+  if(NOT OMNIDETECT_WINDEPLOYQT_EXECUTABLE)
+    find_program(
+      OMNIDETECT_WINDEPLOYQT_EXECUTABLE
+      NAMES windeployqt windeployqt.exe
+    )
+  endif()
+
+  if(NOT OMNIDETECT_WINDEPLOYQT_EXECUTABLE)
+    message(FATAL_ERROR
+      "Qt 6 was found, but windeployqt was not found. "
+      "Set Qt6_DIR to the MSVC Qt package, for example "
+      "C:/Qt/6.11.2/msvc2022_64/lib/cmake/Qt6.")
+  endif()
+
+  add_custom_command(
+    TARGET "${target_name}"
+    POST_BUILD
+    COMMAND "${OMNIDETECT_WINDEPLOYQT_EXECUTABLE}"
+      --release
+      --no-translations
+      --no-compiler-runtime
+      "$<TARGET_FILE:${target_name}>"
+    COMMENT "Deploying Qt runtime for ${target_name}"
+    VERBATIM
+  )
+endfunction()
+
 add_library(omnidetect_core
   core/logging/Logger.cpp
   core/preprocessing/Preprocessor.cpp
@@ -258,6 +354,7 @@ if(OMNIDETECT_BUILD_EDGE)
   target_link_libraries(omnidetect_edge PRIVATE omnidetect_application)
   omnidetect_set_warnings(omnidetect_edge)
   omnidetect_copy_onnx_runtime(omnidetect_edge)
+  omnidetect_copy_opencv_runtime(omnidetect_edge)
 endif()
 
 if(OMNIDETECT_BUILD_DESKTOP)
@@ -274,6 +371,8 @@ if(OMNIDETECT_BUILD_DESKTOP)
     target_link_libraries(omnidetect_desktop PRIVATE omnidetect_application Qt6::Widgets)
     omnidetect_set_warnings(omnidetect_desktop)
     omnidetect_copy_onnx_runtime(omnidetect_desktop)
+    omnidetect_copy_opencv_runtime(omnidetect_desktop)
+    omnidetect_deploy_qt(omnidetect_desktop)
   else()
     message(STATUS "Qt 6 Widgets not found: desktop target disabled. Set Qt6_DIR and reconfigure to enable it.")
   endif()
@@ -304,6 +403,7 @@ if(OMNIDETECT_BUILD_TESTS)
   endif()
   omnidetect_set_warnings(omnidetect_tests)
   omnidetect_copy_onnx_runtime(omnidetect_tests)
+  omnidetect_copy_opencv_runtime(omnidetect_tests)
   add_test(NAME omnidetect_tests COMMAND omnidetect_tests)
 endif()
 
