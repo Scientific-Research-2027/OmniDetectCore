@@ -8,6 +8,7 @@ Type=simple
 User=omnidetect
 Group=omnidetect
 WorkingDirectory=/opt/omnidetect
+EnvironmentFile=-/etc/omnidetect/camera.env
 ExecStart=/opt/omnidetect/bin/omnidetect_edge --config /etc/omnidetect/config.yaml
 Restart=on-failure
 RestartSec=3
@@ -23,4 +24,3 @@ StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
-

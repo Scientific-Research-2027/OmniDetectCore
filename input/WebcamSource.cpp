@@ -31,8 +31,13 @@ bool WebcamSource::open(std::string& error) noexcept {
   return false;
 #else
   try {
-    if (!impl_->capture.open(impl_->config.deviceIndex)) {
-      error = "Cannot open camera device " + std::to_string(impl_->config.deviceIndex);
+    const bool opened = impl_->config.devicePath.empty()
+                            ? impl_->capture.open(impl_->config.deviceIndex)
+                            : impl_->capture.open(impl_->config.devicePath);
+    if (!opened) {
+      error = impl_->config.devicePath.empty()
+                  ? "Cannot open camera device " + std::to_string(impl_->config.deviceIndex)
+                  : "Cannot open camera device path " + impl_->config.devicePath;
       return false;
     }
     if (impl_->config.width > 0) impl_->capture.set(cv::CAP_PROP_FRAME_WIDTH, impl_->config.width);
@@ -107,4 +112,3 @@ SourceMetadata WebcamSource::metadata() const {
 }
 
 }  // namespace omnidetect
-

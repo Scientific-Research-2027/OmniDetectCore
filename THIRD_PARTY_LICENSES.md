@@ -1,16 +1,16 @@
-# Third-party licensing notes
+# Ghi chú giấy phép bên thứ ba
 
-OmniDetectCore source code is provided under Apache License 2.0. Optional dependencies are not vendored and retain their own licenses. Verify the exact versions and transitive notices in every distributed binary.
+Mã nguồn OmniDetectCore được cung cấp theo Apache License 2.0. Dependency tùy chọn không được vendoring và vẫn giữ giấy phép riêng. Khi phát hành binary, phải kiểm tra đúng phiên bản, dependency chuyển tiếp và notice tương ứng.
 
-| Dependency | Typical license | Used for |
+| Dependency | Giấy phép thường gặp | Mục đích |
 |---|---|---|
-| OpenCV | Apache-2.0 | Image/video/webcam and recording adapters |
-| Qt 6 | LGPL-3.0/GPL/commercial, depending on edition/modules | Desktop UI |
-| NCNN | BSD-3-Clause | Edge inference |
-| ONNX Runtime | MIT | Desktop/reference inference |
-| spdlog | MIT | Structured logging when installed |
-| GoogleTest | BSD-3-Clause | Unit-test runner when installed |
-| Ultralytics | AGPL-3.0 or enterprise terms depending on use/version | Offline model export only |
+| OpenCV | Apache-2.0 | Ảnh, video, webcam, RTSP, GStreamer và recorder |
+| Qt 6 | LGPL-3.0/GPL/thương mại tùy edition/module | Giao diện desktop |
+| NCNN | BSD-3-Clause | Inference edge |
+| ONNX Runtime | MIT | Inference desktop/tham chiếu |
+| libcurl | curl license | Lệnh PTZ ONVIF |
+| spdlog | MIT | Logging khi được cài |
+| GoogleTest | BSD-3-Clause | Test runner khi được cài |
+| Ultralytics | Điều khoản tùy phiên bản/cách dùng | Export model ngoại tuyến |
 
-Model weights and training datasets may carry separate restrictions. Their provenance and license must be recorded with each released artifact.
-
+Model weight và dataset có thể có hạn chế riêng. Phải ghi lại nguồn gốc và giấy phép cùng mỗi artifact phát hành.

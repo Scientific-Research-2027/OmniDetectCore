@@ -4,6 +4,9 @@
 /.cache/
 /.venv/
 __pycache__/
+*.env
+config/*.local.yaml
+soak-report*/
 *.user
 *.suo
 *.pdb

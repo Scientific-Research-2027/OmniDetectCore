@@ -47,6 +47,24 @@ class LatestValueQueue {
     return value;
   }
 
+  // Removes and returns the newest value without blocking. Older queued values are discarded.
+  [[nodiscard]] std::optional<T> tryPopLatest(std::size_t* discarded = nullptr) {
+    const std::scoped_lock lock(mutex_);
+    if (queue_.empty()) return std::nullopt;
+    const auto older = queue_.size() - 1U;
+    T value = std::move(queue_.back());
+    queue_.clear();
+    if (discarded != nullptr) *discarded = older;
+    spaceAvailable_.notify_all();
+    return value;
+  }
+
+  void clear() noexcept {
+    const std::scoped_lock lock(mutex_);
+    queue_.clear();
+    spaceAvailable_.notify_all();
+  }
+
   void close() noexcept {
     const std::scoped_lock lock(mutex_);
     closed_ = true;
@@ -72,6 +90,8 @@ class LatestValueQueue {
     return closed_;
   }
 
+  [[nodiscard]] std::size_t capacity() const noexcept { return capacity_; }
+
  private:
   const std::size_t capacity_;
   const bool dropOld_;
@@ -83,4 +103,3 @@ class LatestValueQueue {
 };
 
 }  // namespace omnidetect
-

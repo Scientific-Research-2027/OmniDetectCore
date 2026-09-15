@@ -1,0 +1,85 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "portable-debug",
+      "displayName": "Portable Debug",
+      "binaryDir": "${sourceDir}/build/portable-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "OMNIDETECT_BUILD_DESKTOP": "OFF",
+        "OMNIDETECT_ENABLE_NCNN": "OFF",
+        "OMNIDETECT_ENABLE_ONNX": "OFF",
+        "OMNIDETECT_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
+      "name": "portable-release",
+      "displayName": "Portable Release",
+      "binaryDir": "${sourceDir}/build/portable-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "OMNIDETECT_BUILD_DESKTOP": "OFF",
+        "OMNIDETECT_ENABLE_NCNN": "OFF",
+        "OMNIDETECT_ENABLE_ONNX": "OFF",
+        "OMNIDETECT_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
+      "name": "pi5-ncnn-release",
+      "displayName": "Raspberry Pi 5 NCNN Release",
+      "binaryDir": "${sourceDir}/build/pi5-ncnn-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "OMNIDETECT_BUILD_DESKTOP": "OFF",
+        "OMNIDETECT_BUILD_EDGE": "ON",
+        "OMNIDETECT_ENABLE_NCNN": "ON",
+        "OMNIDETECT_ENABLE_ONNX": "OFF",
+        "OMNIDETECT_WARNINGS_AS_ERRORS": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "pi5-ncnn-libcamera-onvif",
+      "displayName": "Raspberry Pi 5 NCNN + libcamera + ONVIF",
+      "inherits": "pi5-ncnn-release",
+      "binaryDir": "${sourceDir}/build/pi5-full",
+      "cacheVariables": {
+        "OMNIDETECT_ENABLE_LIBCAMERA": "ON",
+        "OMNIDETECT_ENABLE_ONVIF": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "portable-debug", "configurePreset": "portable-debug" },
+    { "name": "portable-release", "configurePreset": "portable-release" },
+    { "name": "pi5-ncnn-release", "configurePreset": "pi5-ncnn-release", "jobs": 4 },
+    { "name": "pi5-ncnn-libcamera-onvif", "configurePreset": "pi5-ncnn-libcamera-onvif", "jobs": 4 }
+  ],
+  "testPresets": [
+    {
+      "name": "portable-debug",
+      "configurePreset": "portable-debug",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "portable-release",
+      "configurePreset": "portable-release",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "pi5-ncnn-release",
+      "configurePreset": "pi5-ncnn-release",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}

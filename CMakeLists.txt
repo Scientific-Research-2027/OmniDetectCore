@@ -16,6 +16,8 @@ option(OMNIDETECT_ENABLE_NCNN "Enable the NCNN inference backend" OFF)
 option(OMNIDETECT_ENABLE_ONNX "Enable the ONNX Runtime inference backend" OFF)
 option(OMNIDETECT_ENABLE_MQTT "Enable the MQTT output adapter" OFF)
 option(OMNIDETECT_ENABLE_TRACKING "Enable the built-in IoU tracker" ON)
+option(OMNIDETECT_ENABLE_LIBCAMERA "Enable libcamera through OpenCV/GStreamer on Linux" OFF)
+option(OMNIDETECT_ENABLE_ONVIF "Enable ONVIF PTZ commands through libcurl" OFF)
 option(OMNIDETECT_WARNINGS_AS_ERRORS "Treat project warnings as errors" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -29,6 +31,14 @@ include(ProjectWarnings)
 find_package(Threads REQUIRED)
 find_package(OpenCV QUIET COMPONENTS core imgcodecs imgproc videoio)
 find_package(spdlog QUIET)
+
+if(OMNIDETECT_ENABLE_LIBCAMERA AND (WIN32 OR NOT OpenCV_FOUND))
+  message(FATAL_ERROR "OMNIDETECT_ENABLE_LIBCAMERA requires Linux and OpenCV built with GStreamer support.")
+endif()
+
+if(OMNIDETECT_ENABLE_ONVIF)
+  find_package(CURL REQUIRED)
+endif()
 
 if(OMNIDETECT_ENABLE_NCNN)
   find_package(ncnn CONFIG QUIET)
@@ -286,9 +296,11 @@ add_library(omnidetect_core
   core/yolo/Yolo26Detector.cpp
   core/tracking/ObjectTracker.cpp
   core/monitoring/ObjectMonitor.cpp
+  core/monitoring/MultiObjectMonitor.cpp
   core/monitoring/KiteMonitor.cpp
   core/monitoring/EventEngine.cpp
   config/ConfigManager.cpp
+  config/MultiCameraConfigParser.cpp
 )
 target_include_directories(omnidetect_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(omnidetect_core PUBLIC Threads::Threads)
@@ -311,6 +323,8 @@ if(OMNIDETECT_ENABLE_TRACKING)
 endif()
 
 add_library(omnidetect_input
+  input/LibcameraSource.cpp
+  input/RtspSource.cpp
   input/ImageSource.cpp
   input/WebcamSource.cpp
   input/VideoSource.cpp
@@ -334,6 +348,9 @@ if(OpenCV_FOUND)
   target_link_libraries(omnidetect_input PRIVATE ${OpenCV_LIBS})
   target_include_directories(omnidetect_input PRIVATE ${OpenCV_INCLUDE_DIRS})
   target_compile_definitions(omnidetect_input PRIVATE OMNIDETECT_HAS_OPENCV=1)
+  if(OMNIDETECT_ENABLE_LIBCAMERA)
+    target_compile_definitions(omnidetect_input PRIVATE OMNIDETECT_HAS_LIBCAMERA=1)
+  endif()
   target_link_libraries(omnidetect_output PRIVATE ${OpenCV_LIBS})
   target_include_directories(omnidetect_output PRIVATE ${OpenCV_INCLUDE_DIRS})
   target_compile_definitions(omnidetect_output PRIVATE OMNIDETECT_HAS_OPENCV=1)
@@ -342,12 +359,27 @@ else()
 endif()
 
 add_library(omnidetect_application
+  control/AutoPtzController.cpp
+  control/CameraControlFactory.cpp
+  control/CameraControlWorker.cpp
+  control/OnvifCameraControl.cpp
+  control/V4l2CameraControl.cpp
   application/DetectionPipeline.cpp
   application/AppController.cpp
+  application/CameraSession.cpp
+  application/CameraManager.cpp
+  application/InferenceScheduler.cpp
+  application/InferenceService.cpp
+  application/ResultRouter.cpp
+  application/EdgeMonitoringService.cpp
 )
 target_include_directories(omnidetect_application PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(omnidetect_application PUBLIC omnidetect_core omnidetect_input omnidetect_output)
 omnidetect_set_warnings(omnidetect_application)
+if(OMNIDETECT_ENABLE_ONVIF)
+  target_link_libraries(omnidetect_application PRIVATE CURL::libcurl)
+  target_compile_definitions(omnidetect_application PRIVATE OMNIDETECT_HAS_ONVIF_CURL=1)
+endif()
 
 if(OMNIDETECT_BUILD_EDGE)
   add_executable(omnidetect_edge apps/edge/main.cpp)
@@ -391,6 +423,8 @@ if(OMNIDETECT_BUILD_TESTS)
   add_executable(omnidetect_tests
     tests/test_main.cpp
     tests/CoreTests.cpp
+    tests/CameraControlTests.cpp
+    tests/MultiCameraTests.cpp
     tests/PipelineTests.cpp
   )
   target_link_libraries(omnidetect_tests PRIVATE omnidetect_application)

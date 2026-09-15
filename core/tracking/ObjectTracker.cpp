@@ -17,9 +17,9 @@ float iou(const BoundingBox& left, const BoundingBox& right) noexcept {
 }
 }  // namespace
 
-ObjectTracker::ObjectTracker(TrackerConfig config) : config_(config) {}
+IouObjectTracker::IouObjectTracker(TrackerConfig config) : config_(config) {}
 
-void ObjectTracker::update(DetectionResult& result) {
+void IouObjectTracker::update(DetectionResult& result) {
   for (auto& track : tracks_) {
     ++track.age;
     ++track.lostFrames;
@@ -59,10 +59,9 @@ void ObjectTracker::update(DetectionResult& result) {
                 tracks_.end());
 }
 
-void ObjectTracker::reset() noexcept {
+void IouObjectTracker::reset() noexcept {
   tracks_.clear();
   nextId_ = 1;
 }
 
 }  // namespace omnidetect
-

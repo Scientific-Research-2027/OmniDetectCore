@@ -1,0 +1,112 @@
+# Mẫu triển khai đa camera. Không commit URL, username hoặc password thật.
+model:
+  type: yolo26n
+  path: ../models/yolo26n/yolo26n.param
+  weights_path: ../models/yolo26n/yolo26n.bin
+  input_size: 416
+  confidence: 0.45
+  iou: 0.50
+  max_detections: 100
+  output_layout: auto
+  classes: [person, car, bicycle]
+
+inference:
+  backend: ncnn
+  threads: 4
+  worker_count: 1
+  scheduler: round_robin
+  max_frame_age_ms: 500
+  max_total_fps: 12
+  input_name: images
+  vulkan: false
+
+application:
+  fail_fast: false
+
+output:
+  image_path: ../data/snapshots/detection.ppm
+  recorder: false
+  recording_path: ../data/recordings/camera.mp4
+
+logging:
+  level: info
+
+cameras:
+  - id: entrance
+    enabled: true
+    priority: 1
+    source:
+      type: rtsp
+      uri: ${CAM_ENTRANCE_RTSP}
+      width: 1280
+      height: 720
+      capture_fps: 15
+      inference_fps: 3
+      queue_size: 1
+      startup_timeout_ms: 5000
+      reconnect_initial_ms: 250
+      reconnect_max_ms: 10000
+    tracking:
+      enabled: true
+      minimum_iou: 0.30
+      max_lost_frames: 30
+      minimum_hits: 1
+    monitoring:
+      enabled: true
+      confirmation_frames: 3
+      lost_frames: 10
+      minimum_confidence: 0.50
+      target_class_ids: [0]
+    control:
+      enabled: true
+      type: onvif
+      endpoint: ${CAM_ENTRANCE_ONVIF_ENDPOINT}
+      profile_token: Profile_1
+      username: ${CAM_ENTRANCE_ONVIF_USER}
+      password: ${CAM_ENTRANCE_ONVIF_PASSWORD}
+      timeout_ms: 2000
+      queue_size: 4
+      max_commands_per_second: 4
+      manual_override_ms: 3000
+      auto_ptz:
+        enabled: true
+        dead_zone: 0.10
+        hysteresis: 0.02
+        gain: 0.50
+        max_speed: 0.50
+        target_box_ratio: 0.20
+        zoom_dead_band: 0.05
+        command_interval_ms: 250
+        target_hold_ms: 2000
+        lost_timeout_ms: 1000
+        switch_margin: 0.15
+        priority_classes: [0, 2]
+
+  - id: yard-csi
+    enabled: true
+    priority: 1
+    source:
+      type: libcamera
+      device: platform:camera0
+      width: 1280
+      height: 720
+      capture_fps: 15
+      inference_fps: 3
+      queue_size: 1
+      startup_timeout_ms: 5000
+      reconnect_initial_ms: 250
+      reconnect_max_ms: 10000
+    tracking:
+      enabled: true
+      minimum_iou: 0.30
+      max_lost_frames: 30
+      minimum_hits: 1
+    monitoring:
+      enabled: true
+      confirmation_frames: 3
+      lost_frames: 10
+      minimum_confidence: 0.50
+      target_classes: [person, car]
+    control:
+      enabled: false
+      type: none

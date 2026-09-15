@@ -7,21 +7,81 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <chrono>
 #include <string>
+#include <vector>
 
 namespace omnidetect {
 
-enum class SourceType { Image, Webcam, Video, CameraId };
+enum class SourceType { Image, Webcam, Video, CameraId, Rtsp, Libcamera };
 
 struct SourceConfig {
   SourceType type{SourceType::Webcam};
   std::filesystem::path path;
+  std::string uri;
+  std::string devicePath;
   int device{0};
   int width{1280};
   int height{720};
   double fps{0.0};
+  double captureFps{0.0};
+  double inferenceFps{3.0};
   bool loop{false};
   std::string sourceId{"default"};
+};
+
+enum class CameraControlType { None, Onvif, V4l2 };
+
+struct AutoPtzConfig {
+  bool enabled{false};
+  float deadZone{0.10F};
+  float hysteresis{0.02F};
+  float panTiltGain{0.50F};
+  float maximumSpeed{0.50F};
+  float targetBoxRatio{0.20F};
+  float zoomDeadBand{0.05F};
+  std::chrono::milliseconds commandInterval{250};
+  std::chrono::milliseconds targetHold{2000};
+  std::chrono::milliseconds lostTimeout{1000};
+  float switchMargin{0.15F};
+  std::vector<int> priorityClasses;
+};
+
+struct CameraControlConfig {
+  bool enabled{false};
+  CameraControlType type{CameraControlType::None};
+  std::string endpoint;
+  std::string profileToken{"Profile_1"};
+  std::string username;
+  std::string password;
+  std::chrono::milliseconds timeout{2000};
+  std::chrono::milliseconds manualOverrideHold{3000};
+  std::size_t queueSize{4};
+  double maximumCommandsPerSecond{4.0};
+  AutoPtzConfig autoPtz;
+};
+
+struct CameraConfig {
+  std::string id;
+  bool enabled{true};
+  int priority{1};
+  SourceConfig source;
+  std::size_t frameQueueSize{1};
+  std::chrono::milliseconds startupTimeout{5000};
+  std::chrono::milliseconds reconnectInitialDelay{250};
+  std::chrono::milliseconds reconnectMaximumDelay{10000};
+  bool trackingEnabled{true};
+  TrackerConfig tracker;
+  bool monitoringEnabled{true};
+  MonitorConfig monitor;
+  CameraControlConfig control;
+};
+
+struct SharedInferenceConfig {
+  std::size_t workerCount{1};
+  std::string scheduler{"round_robin"};
+  std::chrono::milliseconds maxFrameAge{500};
+  double maximumTotalFps{0.0};
 };
 
 struct PipelineConfig {
@@ -45,6 +105,9 @@ struct AppConfig {
   std::string backend{"ncnn"};
   BackendConfig backendConfig;
   SourceConfig source;
+  std::vector<CameraConfig> cameras;
+  SharedInferenceConfig sharedInference;
+  bool failFast{false};
   PipelineConfig pipeline;
   TrackerConfig tracker;
   MonitorConfig monitor;
@@ -65,4 +128,3 @@ class ConfigManager {
 };
 
 }  // namespace omnidetect
-

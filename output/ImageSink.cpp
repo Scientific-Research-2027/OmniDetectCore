@@ -3,6 +3,7 @@
 #include "core/logging/Logger.h"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -51,6 +52,17 @@ std::string escaped(const std::string& value) {
   return result;
 }
 
+std::string safeComponent(const std::string& value) {
+  std::string result;
+  result.reserve(value.size());
+  for (const unsigned char character : value) {
+    result.push_back(std::isalnum(character) != 0 || character == '-' || character == '_'
+                         ? static_cast<char>(character)
+                         : '_');
+  }
+  return result.empty() ? "camera" : result;
+}
+
 }  // namespace
 
 ImageSink::ImageSink(std::filesystem::path outputPath, const bool appendFrameId)
@@ -76,7 +88,8 @@ void ImageSink::consume(const Frame& frame, const DetectionResult& result) noexc
     auto path = outputPath_;
     if (appendFrameId_) {
       path = outputPath_.parent_path() /
-             (outputPath_.stem().string() + "_" + std::to_string(frame.frameId) + ".ppm");
+             (outputPath_.stem().string() + "_" + safeComponent(result.sourceId) + "_" +
+              std::to_string(frame.frameId) + ".ppm");
     } else {
       path.replace_extension(".ppm");
     }
@@ -128,4 +141,3 @@ std::string ImageSink::lastError() const {
 }
 
 }  // namespace omnidetect
-

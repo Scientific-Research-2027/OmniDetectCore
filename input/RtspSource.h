@@ -1,24 +1,17 @@
 #pragma once
 
+#include "config/ConfigManager.h"
 #include "input/IFrameSource.h"
 
 #include <memory>
 
 namespace omnidetect {
 
-struct WebcamConfig {
-  int deviceIndex{0};
-  std::string devicePath;
-  int width{1280};
-  int height{720};
-  double fps{0.0};
-  std::string sourceId{"webcam-0"};
-};
-
-class WebcamSource final : public IFrameSource {
+class RtspSource final : public IFrameSource {
  public:
-  explicit WebcamSource(WebcamConfig config = {});
-  ~WebcamSource() override;
+  explicit RtspSource(SourceConfig config);
+  ~RtspSource() override;
+
   bool open(std::string& error) noexcept override;
   FrameReadResult read() noexcept override;
   void close() noexcept override;

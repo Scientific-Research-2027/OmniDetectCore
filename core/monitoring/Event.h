@@ -16,6 +16,15 @@ enum class EventType {
   ObjectLost,
   SourceDisconnected,
   SourceRecovered,
+  CameraConnected,
+  CameraDisconnected,
+  CameraRecovered,
+  CameraControlError,
+  PtzStarted,
+  PtzStopped,
+  TargetAcquired,
+  TargetLost,
+  InferenceOverload,
   ModelError,
   RecordingStarted,
   RecordingStopped
@@ -32,4 +41,3 @@ struct Event {
 };
 
 }  // namespace omnidetect
-

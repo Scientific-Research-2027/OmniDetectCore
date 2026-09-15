@@ -2,6 +2,8 @@
 
 #include "core/logging/Logger.h"
 
+#include <cctype>
+#include <unordered_map>
 #include <utility>
 
 #ifdef OMNIDETECT_HAS_OPENCV
@@ -15,9 +17,28 @@ struct RecorderSink::Impl {
   RecorderConfig config;
   bool started{false};
 #ifdef OMNIDETECT_HAS_OPENCV
-  cv::VideoWriter writer;
+  struct Stream {
+    cv::VideoWriter writer;
+    int width{0};
+    int height{0};
+    std::filesystem::path path;
+  };
+  std::unordered_map<std::string, Stream> streams;
 #endif
 };
+
+namespace {
+std::string safeSourceId(const std::string& value) {
+  std::string result;
+  result.reserve(value.size());
+  for (const unsigned char character : value) {
+    result.push_back(std::isalnum(character) != 0 || character == '-' || character == '_'
+                         ? static_cast<char>(character)
+                         : '_');
+  }
+  return result.empty() ? "camera" : result;
+}
+}  // namespace
 
 RecorderSink::RecorderSink(RecorderConfig config) : impl_(std::make_unique<Impl>()) { impl_->config = std::move(config); }
 RecorderSink::~RecorderSink() { stop(); }
@@ -46,10 +67,16 @@ void RecorderSink::consume(const Frame& frame, const DetectionResult& result) no
 #ifdef OMNIDETECT_HAS_OPENCV
   if (!impl_->started || !frame.valid()) return;
   try {
-    if (impl_->config.maxBytes > 0 && std::filesystem::exists(impl_->config.path) &&
-        std::filesystem::file_size(impl_->config.path) >= impl_->config.maxBytes) {
-      log::warning("Recorder quota reached; recording stopped");
-      stop();
+    const auto source = safeSourceId(result.sourceId);
+    auto path = impl_->config.path.parent_path() /
+                (impl_->config.path.stem().string() + "_" + source + impl_->config.path.extension().string());
+    if (impl_->config.maxBytes > 0 && std::filesystem::exists(path) &&
+        std::filesystem::file_size(path) >= impl_->config.maxBytes) {
+      log::warning("Recorder quota reached for camera " + source);
+      if (const auto found = impl_->streams.find(source); found != impl_->streams.end()) {
+        found->second.writer.release();
+        impl_->streams.erase(found);
+      }
       return;
     }
     const auto& image = *frame.image;
@@ -64,16 +91,23 @@ void RecorderSink::consume(const Frame& frame, const DetectionResult& result) no
                                   static_cast<int>(detection.bbox.width), static_cast<int>(detection.bbox.height)),
                     cv::Scalar(40, 80, 255), 2);
     }
-    if (!impl_->writer.isOpened()) {
-      impl_->writer.open(impl_->config.path.string(), cv::VideoWriter::fourcc('m', 'p', '4', 'v'),
+    auto& stream = impl_->streams[source];
+    if (!stream.writer.isOpened()) {
+      stream.path = std::move(path);
+      stream.width = bgr.cols;
+      stream.height = bgr.rows;
+      stream.writer.open(stream.path.string(), cv::VideoWriter::fourcc('m', 'p', '4', 'v'),
                          impl_->config.fps, bgr.size(), true);
-      if (!impl_->writer.isOpened()) {
+      if (!stream.writer.isOpened()) {
         log::error("Recorder failed to open output codec/path");
-        impl_->started = false;
+        impl_->streams.erase(source);
         return;
       }
+    } else if (stream.width != bgr.cols || stream.height != bgr.rows) {
+      log::error("Recorder frame size changed for camera " + source);
+      return;
     }
-    impl_->writer.write(bgr);
+    stream.writer.write(bgr);
   } catch (const std::exception& exception) {
     log::error(std::string("Recorder failed: ") + exception.what());
   }
@@ -85,10 +119,13 @@ void RecorderSink::consume(const Frame& frame, const DetectionResult& result) no
 
 void RecorderSink::stop() noexcept {
 #ifdef OMNIDETECT_HAS_OPENCV
-  if (impl_->writer.isOpened()) impl_->writer.release();
+  for (auto& [unused, stream] : impl_->streams) {
+    static_cast<void>(unused);
+    if (stream.writer.isOpened()) stream.writer.release();
+  }
+  impl_->streams.clear();
 #endif
   impl_->started = false;
 }
 
 }  // namespace omnidetect
-

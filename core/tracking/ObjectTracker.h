@@ -13,12 +13,20 @@ struct TrackerConfig {
   std::uint32_t minimumHits{1};
 };
 
-class ObjectTracker {
+class IObjectTracker {
  public:
-  explicit ObjectTracker(TrackerConfig config = {});
-  void update(DetectionResult& result);
-  void reset() noexcept;
-  [[nodiscard]] std::size_t activeTrackCount() const noexcept { return tracks_.size(); }
+  virtual ~IObjectTracker() = default;
+  virtual void update(DetectionResult& result) = 0;
+  virtual void reset() noexcept = 0;
+  [[nodiscard]] virtual std::size_t activeTrackCount() const noexcept = 0;
+};
+
+class IouObjectTracker final : public IObjectTracker {
+ public:
+  explicit IouObjectTracker(TrackerConfig config = {});
+  void update(DetectionResult& result) override;
+  void reset() noexcept override;
+  [[nodiscard]] std::size_t activeTrackCount() const noexcept override { return tracks_.size(); }
 
  private:
   struct Track {
@@ -35,5 +43,7 @@ class ObjectTracker {
   std::vector<Track> tracks_;
 };
 
-}  // namespace omnidetect
+// Source-compatible name for the original single-camera pipeline.
+using ObjectTracker = IouObjectTracker;
 
+}  // namespace omnidetect

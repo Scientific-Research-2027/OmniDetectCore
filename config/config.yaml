@@ -1,50 +1,61 @@
+# Cấu hình phát triển: một webcam nhưng chạy qua kiến trúc multi-camera.
 model:
-  type: yolo26
+  type: yolo26n
   path: ../models/yolo26n/model.onnx
   input_size: 416
   confidence: 0.45
   iou: 0.50
   max_detections: 100
   output_layout: auto
-  class_names: [kite]
+  classes: [kite]
 
 inference:
   backend: onnx
   threads: 4
+  worker_count: 1
+  scheduler: round_robin
+  max_frame_age_ms: 500
+  max_total_fps: 0
   input_name: images
   vulkan: false
 
-source:
-  type: webcam
-  id: camera-0
-  device: 0
-  width: 1280
-  height: 720
-  fps: 30
-  loop: false
-
-pipeline:
-  frame_queue_size: 2
-  result_queue_size: 2
-  drop_old_frames: true
-
-tracking:
-  enabled: true
-  minimum_iou: 0.30
-  max_lost_frames: 30
-
-monitoring:
-  enabled: true
-  confirmation_frames: 3
-  lost_frames: 10
-  minimum_confidence: 0.50
-  target_classes:
-    - kite
+application:
+  fail_fast: false
 
 output:
-  window: true
+  window: false
   recorder: false
   mqtt: false
 
 logging:
   level: info
+
+cameras:
+  - id: camera-0
+    enabled: true
+    priority: 1
+    source:
+      type: webcam
+      device: 0
+      width: 1280
+      height: 720
+      capture_fps: 30
+      inference_fps: 3
+      queue_size: 1
+      startup_timeout_ms: 5000
+      reconnect_initial_ms: 250
+      reconnect_max_ms: 10000
+    tracking:
+      enabled: true
+      minimum_iou: 0.30
+      max_lost_frames: 30
+      minimum_hits: 1
+    monitoring:
+      enabled: true
+      confirmation_frames: 3
+      lost_frames: 10
+      minimum_confidence: 0.50
+      target_classes: [kite]
+    control:
+      enabled: false
+      type: none
